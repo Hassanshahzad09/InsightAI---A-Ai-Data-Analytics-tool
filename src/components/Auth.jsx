@@ -153,61 +153,6 @@ export const Auth = ({ onDemoBypass }) => {
 
         <form onSubmit={handleAuth} style={{ display: 'flex', flexDirection: 'column', gap: '1.2rem' }}>
           
-          {/* Sign In vs Register tab selector */}
-          {isSupabaseConfigured && (
-            <div style={{ 
-              display: 'flex', 
-              background: 'var(--bg-color)', 
-              padding: '0.25rem', 
-              borderRadius: '10px',
-              border: '1px solid var(--border-color)',
-              marginBottom: '0.25rem'
-            }}>
-              <button 
-                type="button"
-                className="btn-secondary"
-                onClick={() => { setIsSignUp(false); setError(null); setSuccessMsg(null); }}
-                style={{ 
-                  flex: 1, 
-                  padding: '0.45rem', 
-                  borderRadius: '8px', 
-                  border: 'none', 
-                  background: !isSignUp ? 'var(--panel-bg-solid)' : 'transparent',
-                  color: !isSignUp ? 'var(--primary)' : 'var(--text-muted)',
-                  fontWeight: 700,
-                  fontSize: '0.85rem',
-                  cursor: 'pointer',
-                  height: '34px',
-                  boxShadow: !isSignUp ? 'var(--shadow-sm)' : 'none',
-                  transition: 'all 0.2s'
-                }}
-              >
-                Sign In
-              </button>
-              <button 
-                type="button"
-                className="btn-secondary"
-                onClick={() => { setIsSignUp(true); setError(null); setSuccessMsg(null); }}
-                style={{ 
-                  flex: 1, 
-                  padding: '0.45rem', 
-                  borderRadius: '8px', 
-                  border: 'none', 
-                  background: isSignUp ? 'var(--panel-bg-solid)' : 'transparent',
-                  color: isSignUp ? 'var(--primary)' : 'var(--text-muted)',
-                  fontWeight: 700,
-                  fontSize: '0.85rem',
-                  cursor: 'pointer',
-                  height: '34px',
-                  boxShadow: isSignUp ? 'var(--shadow-sm)' : 'none',
-                  transition: 'all 0.2s'
-                }}
-              >
-                Create Account
-              </button>
-            </div>
-          )}
-
           {error && (
             <div style={{ background: 'rgba(239, 68, 68, 0.05)', border: '1px solid rgba(239, 68, 68, 0.15)', borderRadius: '8px', padding: '0.75rem 1rem', display: 'flex', alignItems: 'center', gap: '0.5rem', color: 'var(--danger)', fontSize: '0.8rem' }}>
               <AlertCircle size={16} style={{ flexShrink: 0 }} />
@@ -219,67 +164,6 @@ export const Auth = ({ onDemoBypass }) => {
             <div style={{ background: 'rgba(34, 197, 94, 0.05)', border: '1px solid rgba(34, 197, 94, 0.15)', borderRadius: '8px', padding: '0.75rem 1rem', display: 'flex', alignItems: 'center', gap: '0.5rem', color: 'var(--success)', fontSize: '0.8rem' }}>
               <CheckCircle size={16} style={{ flexShrink: 0 }} />
               <span>{successMsg}</span>
-            </div>
-          )}
-
-          {/* SaaS signup inputs fields (Shown only during Sign Up OR when DB is not configured to collect mock info) */}
-          {(isSignUp || !isSupabaseConfigured) && (
-            <div className="animate-scale-in" style={{ display: 'flex', flexDirection: 'column', gap: '1.2rem' }}>
-              
-              {/* Full Name */}
-              <div className="option-group" style={{ gap: '0.4rem' }}>
-                <label style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-muted)' }}>Full Name</label>
-                <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
-                  <User size={15} style={{ position: 'absolute', left: '12px', color: 'var(--text-muted)' }} />
-                  <input 
-                    type="text" 
-                    className="search-input" 
-                    placeholder="Hassan Shahzad" 
-                    value={fullName}
-                    onChange={(e) => setFullName(e.target.value)}
-                    style={{ paddingLeft: '2.5rem', width: '100%', minWidth: 'unset', height: '40px' }}
-                    required
-                  />
-                </div>
-              </div>
-
-              {/* Company / Organisation */}
-              <div className="option-group" style={{ gap: '0.4rem' }}>
-                <label style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-muted)' }}>Company Name</label>
-                <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
-                  <Building size={15} style={{ position: 'absolute', left: '12px', color: 'var(--text-muted)' }} />
-                  <input 
-                    type="text" 
-                    className="search-input" 
-                    placeholder="Acme Analytics" 
-                    value={company}
-                    onChange={(e) => setCompany(e.target.value)}
-                    style={{ paddingLeft: '2.5rem', width: '100%', minWidth: 'unset', height: '40px' }}
-                  />
-                </div>
-              </div>
-
-              {/* Job Role Dropdown */}
-              <div className="option-group" style={{ gap: '0.4rem' }}>
-                <label style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-muted)' }}>Job Role</label>
-                <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
-                  <Briefcase size={15} style={{ position: 'absolute', left: '12px', color: 'var(--text-muted)', zIndex: 5 }} />
-                  <select 
-                    className="select-control" 
-                    value={jobRole}
-                    onChange={(e) => setJobRole(e.target.value)}
-                    style={{ paddingLeft: '2.5rem', width: '100%', minWidth: 'unset', height: '40px' }}
-                  >
-                    <option value="Data Analyst">Data Analyst</option>
-                    <option value="Data Scientist">Data Scientist</option>
-                    <option value="Product Manager">Product Manager</option>
-                    <option value="Business Executive">Business Executive</option>
-                    <option value="Software Developer">Software Developer</option>
-                    <option value="Other">Other Role</option>
-                  </select>
-                </div>
-              </div>
-
             </div>
           )}
 
@@ -300,7 +184,7 @@ export const Auth = ({ onDemoBypass }) => {
             </div>
           </div>
 
-          {/* Password & Password Strength (Hidden if signing in) */}
+          {/* Password */}
           <div className="option-group" style={{ gap: '0.4rem' }}>
             <label style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-muted)' }}>Password</label>
             <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
@@ -315,24 +199,6 @@ export const Auth = ({ onDemoBypass }) => {
                 required
               />
             </div>
-            
-            {/* Real-time Password Strength Meter */}
-            {isSignUp && password && (
-              <div className="animate-scale-in" style={{ marginTop: '0.25rem' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.72rem', marginBottom: '0.2rem' }}>
-                  <span style={{ color: 'var(--text-muted)' }}>Password Security:</span>
-                  <strong style={{ color: passwordStrength.color }}>{passwordStrength.label}</strong>
-                </div>
-                <div style={{ height: '4px', background: 'var(--border-color)', borderRadius: '2px', overflow: 'hidden' }}>
-                  <div style={{ 
-                    height: '100%', 
-                    width: `${(passwordStrength.score / 5) * 100}%`, 
-                    background: passwordStrength.color,
-                    transition: 'width 0.3s ease'
-                  }} />
-                </div>
-              </div>
-            )}
           </div>
 
           {/* Submission CTAs */}
@@ -341,20 +207,20 @@ export const Auth = ({ onDemoBypass }) => {
               type="submit" 
               className="btn btn-primary" 
               disabled={loading}
-              style={{ width: '100%', height: '44px', display: 'flex', alignItems: 'center', gap: '0.5rem', marginTop: '0.5rem' }}
+              style={{ width: '100%', height: '44px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem', marginTop: '0.5rem' }}
             >
-              <UserPlus size={16} />
-              {loading ? "Authenticating..." : isSignUp ? "Sign Up as Client" : "Access Workspace"}
+              <Lock size={16} />
+              {loading ? "Signing In..." : "Access Workspace"}
             </button>
           ) : (
             <button 
               type="button" 
               className="btn btn-primary" 
               onClick={handleDemoMode}
-              style={{ width: '100%', height: '44px', display: 'flex', alignItems: 'center', gap: '0.5rem', marginTop: '0.5rem' }}
+              style={{ width: '100%', height: '44px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem', marginTop: '0.5rem' }}
             >
               <Sparkles size={16} />
-              Create Account (Bypass Offline)
+              Access Demo Workspace
             </button>
           )}
 
