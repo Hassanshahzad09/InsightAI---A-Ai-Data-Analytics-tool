@@ -794,3 +794,15 @@ h1, h2, h3, h4, h5, h6 {
   accent-color: var(--primary);
   cursor: pointer;
 }
+
+@media (max-width: 768px) {
+  .dashboard-grid {
+    grid-template-columns: 1fr !important;
+  }
+  .dashboard-grid > div {
+    grid-column: span 1 !important;
+  }
+  .kpi-grid {
+    grid-template-columns: 1fr !important;
+  }
+}

@@ -14,7 +14,12 @@ import {
   AlertTriangle,
   Info,
   Layers,
-  ChevronRight
+  ChevronRight,
+  Hash,
+  Calendar,
+  Type,
+  Tag,
+  HelpCircle
 } from 'lucide-react';
 
 export const DataCleaner = ({ rawData, fileName, onCleaningComplete }) => {
@@ -316,12 +321,48 @@ export const DataCleaner = ({ rawData, fileName, onCleaningComplete }) => {
             </h3>
             
             <div className="column-schema-list">
-              {Object.entries(inferredSchema).map(([colName, type]) => (
-                <div key={colName} className="column-schema-item animate-scale-in" style={{ padding: '0.65rem 0.85rem' }}>
-                  <span style={{ fontWeight: 600, fontSize: '0.85rem' }}>{colName}</span>
-                  <span className={`badge badge-${type}`} style={{ fontSize: '0.7rem' }}>{type}</span>
-                </div>
-              ))}
+              {Object.entries(inferredSchema).map(([colName, type]) => {
+                const getTypeIcon = (t) => {
+                  if (t === 'numeric') return <Hash size={14} style={{ color: 'var(--secondary)' }} />;
+                  if (t === 'date') return <Calendar size={14} style={{ color: 'var(--success)' }} />;
+                  if (t === 'categorical') return <Tag size={14} style={{ color: 'var(--primary)' }} />;
+                  return <Type size={14} style={{ color: 'var(--warning)' }} />;
+                };
+
+                return (
+                  <div 
+                    key={colName} 
+                    className="column-schema-item animate-scale-in" 
+                    style={{ 
+                      display: 'flex', 
+                      alignItems: 'center', 
+                      justifyContent: 'space-between', 
+                      padding: '0.75rem 1rem', 
+                      background: 'var(--panel-bg-solid)', 
+                      border: '1px solid var(--border-color)', 
+                      borderRadius: '12px', 
+                      boxShadow: 'var(--shadow-sm)',
+                      marginBottom: '0.5rem'
+                    }}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                      <div style={{ 
+                        width: '28px', 
+                        height: '28px', 
+                        borderRadius: '8px', 
+                        background: 'rgba(99, 102, 241, 0.05)', 
+                        display: 'flex', 
+                        alignItems: 'center', 
+                        justifyContent: 'center' 
+                      }}>
+                        {getTypeIcon(type)}
+                      </div>
+                      <span style={{ fontWeight: 700, fontSize: '0.88rem', color: 'var(--text-main)' }}>{colName}</span>
+                    </div>
+                    <span className={`badge badge-${type}`} style={{ fontSize: '0.68rem', padding: '0.2rem 0.5rem', borderRadius: '6px' }}>{type}</span>
+                  </div>
+                );
+              })}
             </div>
           </div>
         </div>

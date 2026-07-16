@@ -199,6 +199,30 @@ function App() {
           </div>
 
           <div className="top-nav-actions">
+            {rawData && (
+              <button 
+                onClick={handleResetDataWithConfirm}
+                className="btn btn-secondary animate-scale-in"
+                style={{ 
+                  height: '36px', 
+                  padding: '0 0.85rem', 
+                  fontSize: '0.82rem', 
+                  display: 'inline-flex', 
+                  alignItems: 'center', 
+                  gap: '0.35rem', 
+                  borderRadius: '8px', 
+                  border: '1px solid var(--border-color)',
+                  background: 'var(--panel-bg-solid)',
+                  color: 'var(--text-main)',
+                  cursor: 'pointer',
+                  fontWeight: 600
+                }}
+                title="Unload current dataset and start over"
+              >
+                Reset Data
+              </button>
+            )}
+
             <button className="notification-bell" title="Alerts">
               <Bell size={18} />
               <span className="notification-dot" />
