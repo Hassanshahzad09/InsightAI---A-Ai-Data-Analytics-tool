@@ -24,6 +24,51 @@ import {
   TrendingUp
 } from 'lucide-react';
 
+class ErrorBoundary extends React.Component {
+  constructor(props) {
+    super(props);
+    this.state = { hasError: false, error: null, errorInfo: null };
+  }
+
+  static getDerivedStateFromError(error) {
+    return { hasError: true, error };
+  }
+
+  componentDidCatch(error, errorInfo) {
+    console.error("ErrorBoundary caught an error:", error, errorInfo);
+    this.setState({ errorInfo });
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="glass-card animate-scale-in" style={{ padding: '3rem', margin: '2rem auto', maxWidth: '800px', border: '1px solid var(--danger)', background: 'rgba(239, 68, 68, 0.03)' }}>
+          <h2 style={{ color: 'var(--danger)', fontSize: '1.5rem', fontWeight: 800, marginBottom: '1rem' }}>
+            Application Render Crash Detected
+          </h2>
+          <p style={{ fontSize: '0.9rem', color: 'var(--text-main)', marginBottom: '1.5rem' }}>
+            InsightAI encountered an unexpected error during dashboard rendering. Here is the technical diagnostic data:
+          </p>
+          <pre style={{ background: 'var(--panel-bg-solid)', padding: '1rem', borderRadius: '8px', border: '1px solid var(--border-color)', fontSize: '0.8rem', color: 'var(--danger)', overflowX: 'auto', whiteSpace: 'pre-wrap', fontFamily: 'monospace' }}>
+            {this.state.error && this.state.error.toString()}
+            {"\n\nComponent Stack Trace:\n"}
+            {this.state.errorInfo && this.state.errorInfo.componentStack}
+          </pre>
+          <button 
+            className="btn btn-primary" 
+            onClick={() => window.location.reload()} 
+            style={{ marginTop: '1.5rem', height: '40px' }}
+          >
+            Reload Application
+          </button>
+        </div>
+      );
+    }
+
+    return this.props.children;
+  }
+}
+
 function App() {
   // Authentication states
   const [session, setSession] = useState(null);
@@ -140,11 +185,18 @@ function App() {
   // Imputations complete
   const handleCleaningComplete = (cleaned, inferredSchema, report) => {
     try {
+      if (!cleaned || cleaned.length === 0) {
+        throw new Error("The cleaning configuration resulted in an empty dataset (0 rows remaining). Please adjust your settings (e.g., do not delete rows with missing values).");
+      }
+
       setCleanedData(cleaned);
       setSchema(inferredSchema);
       setCleaningReport(report);
 
       const computedStats = analyzeDataset(cleaned, inferredSchema);
+      if (!computedStats) {
+        throw new Error("Failed to compute statistical summary metrics for the cleaned dataset.");
+      }
       setStats(computedStats);
 
       const generated = generateInsights(computedStats, cleaned);
@@ -154,8 +206,8 @@ function App() {
       setCurrentView('dashboard');
     } catch (err) {
       console.error("Dataset Analysis Failed:", err);
-      alert(`Failed to analyze dataset details:\n${err.message}\n\nPlease try again with another file, or verify the contents are standard tabular records.`);
-      // Reset variables to keep UI clean and stable
+      alert(`Analysis Failed:\n${err.message}\n\nPlease verify your cleaning rules in the Settings panel.`);
+      // Reset variables but KEEP rawData so the user stays on the Cleaner screen!
       setCleanedData(null);
       setSchema(null);
       setStats(null);
@@ -311,62 +363,77 @@ function App() {
           )}
 
           {/* Sub Panels rendering */}
-          {currentView === 'upload' && !rawData && (
-            <UploadSection onDataParsed={handleDataParsed} />
-          )}
+          <ErrorBoundary>
+            {currentView === 'upload' && !rawData && (
+              <UploadSection onDataParsed={handleDataParsed} />
+            )}
 
-          {currentView === 'upload' && rawData && (
-            <DataCleaner 
-              rawData={rawData}
-              fileName={fileName}
-              onCleaningComplete={handleCleaningComplete}
-            />
-          )}
+            {currentView === 'upload' && rawData && (
+              <DataCleaner 
+                rawData={rawData}
+                fileName={fileName}
+                onCleaningComplete={handleCleaningComplete}
+              />
+            )}
 
-          {currentView === 'preview' && cleanedData && (
-            <DataPreview 
-              data={cleanedData}
-              schema={schema}
-              fileName={fileName}
-            />
-          )}
+            {currentView === 'preview' && cleanedData && (
+              <DataPreview 
+                data={cleanedData}
+                schema={schema}
+                fileName={fileName}
+              />
+            )}
 
-          {currentView === 'dashboard' && cleanedData && stats && (
-            <Dashboard 
-              data={cleanedData}
-              schema={schema}
-              stats={stats}
-            />
-          )}
+            {currentView === 'dashboard' && cleanedData && stats && (
+              <Dashboard 
+                data={cleanedData}
+                schema={schema}
+                stats={stats}
+              />
+            )}
 
-          {currentView === 'insights' && cleanedData && stats && insights && (
-            <Insights 
-              stats={stats}
-              data={cleanedData}
-              generatedInsights={insights}
-            />
-          )}
+            {currentView === 'insights' && cleanedData && stats && insights && (
+              <Insights 
+                stats={stats}
+                data={cleanedData}
+                generatedInsights={insights}
+              />
+            )}
 
-          {currentView === 'reports' && cleanedData && stats && (
-            <Reports 
-              data={cleanedData}
-              schema={schema}
-              stats={stats}
-              fileName={fileName}
-            />
-          )}
+            {currentView === 'reports' && cleanedData && stats && (
+              <Reports 
+                data={cleanedData}
+                schema={schema}
+                stats={stats}
+                fileName={fileName}
+              />
+            )}
 
-          {currentView === 'settings' && (
-            <Settings 
-              userSession={{
-                email: userFullName,
-                companyName: activeUser?.user_metadata?.company_name || 'Enterprise Labs',
-                jobRole: activeUser?.user_metadata?.job_role || 'Data Analyst',
-                isDemo: !!demoUser
-              }}
-              onProfileUpdate={handleProfileUpdate}
-            />
-          )}
+            {currentView === 'settings' && (
+              <Settings 
+                userSession={{
+                  email: userFullName,
+                  companyName: activeUser?.user_metadata?.company_name || 'Enterprise Labs',
+                  jobRole: activeUser?.user_metadata?.job_role || 'Data Analyst',
+                  isDemo: !!demoUser
+                }}
+                onProfileUpdate={handleProfileUpdate}
+              />
+            )}
+
+            {/* Fallback for active view with missing data */}
+            {['preview', 'dashboard', 'insights', 'reports'].includes(currentView) && (!cleanedData || !stats) && (
+              <div className="glass-card animate-scale-in" style={{ padding: '3.5rem', textAlign: 'center', margin: '2rem auto', maxWidth: '600px' }}>
+                <h3 style={{ fontSize: '1.25rem', fontWeight: 800, marginBottom: '0.75rem' }}>No Cleaned Dataset Active</h3>
+                <p style={{ color: 'var(--text-muted)', marginBottom: '1.75rem', fontSize: '0.88rem' }}>
+                  Please upload and prepare a dataset to view the charts and analytics.
+                </p>
+                <button className="btn btn-primary" onClick={() => setCurrentView('upload')}>
+                  Go to Upload / Clean
+                </button>
+              </div>
+            )}
+          </ErrorBoundary>
 
         </div>
 
