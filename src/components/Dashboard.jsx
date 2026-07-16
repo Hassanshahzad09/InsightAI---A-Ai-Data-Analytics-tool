@@ -3,6 +3,13 @@ import {
   ResponsiveContainer, 
   BarChart, 
   Bar, 
+  LineChart, 
+  Line, 
+  ScatterChart, 
+  Scatter, 
+  FunnelChart, 
+  Funnel, 
+  LabelList,
   PieChart, 
   Pie, 
   Cell, 
@@ -10,15 +17,18 @@ import {
   YAxis, 
   CartesianGrid, 
   Tooltip, 
-  Legend 
+  Legend,
+  ZAxis,
+  ComposedChart
 } from 'recharts';
 import { 
   SlidersHorizontal,
   Search,
-  ArrowUpRight,
+  Maximize2,
+  X,
   TrendingUp,
   DollarSign,
-  Grid
+  Info
 } from 'lucide-react';
 
 const COLORS = ['#06b6d4', '#84cc16', '#10b981', '#f59e0b', '#22c55e', '#ef4444'];
@@ -29,6 +39,9 @@ export const Dashboard = ({ data, schema, stats }) => {
   const [selectedFilters, setSelectedFilters] = useState({});
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
+  
+  // Zoom Modal State
+  const [zoomedChart, setZoomedChart] = useState(null);
 
   const resetFilters = () => {
     setSelectedFilters({});
@@ -52,6 +65,8 @@ export const Dashboard = ({ data, schema, stats }) => {
   // Filtered rows
   const filteredData = useMemo(() => {
     return data.filter(row => {
+      if (!row) return false;
+      
       if (globalSearch.trim() !== '') {
         const query = globalSearch.toLowerCase();
         const matchesQuery = Object.values(row).some(v => String(v).toLowerCase().includes(query));
@@ -76,6 +91,7 @@ export const Dashboard = ({ data, schema, stats }) => {
     });
   }, [data, globalSearch, selectedFilters, startDate, endDate, stats]);
 
+  // Determine dynamic columns to map to reference layout
   const primaryNum = stats.numericColumns[0] || '';
   const secondaryNum = stats.numericColumns[1] || primaryNum || '';
   const numName = primaryNum || 'Value';
@@ -86,6 +102,12 @@ export const Dashboard = ({ data, schema, stats }) => {
   const catSize = stats.categoricalColumns[3] || stats.categoricalColumns[0] || 'Size';
   const dateCol = stats.dateColumns[0] || '';
 
+  // Helper to sum a column
+  const getSum = (col) => {
+    if (!col) return 0;
+    return filteredData.reduce((acc, row) => acc + (Number(row[col]) || 0), 0);
+  };
+
   // Universal dynamic grouped aggregator
   const getGroupedChartData = (xAxisCol, groupCol, measureCol, operation = 'count') => {
     if (!xAxisCol) return { keys: [], data: [] };
@@ -93,6 +115,7 @@ export const Dashboard = ({ data, schema, stats }) => {
     const uniqueGroupVals = new Set();
 
     filteredData.forEach(row => {
+      if (!row) return;
       const xVal = String(row[xAxisCol] || 'No');
       const gVal = groupCol ? String(row[groupCol] || 'Standard') : 'Count';
       
@@ -135,21 +158,84 @@ export const Dashboard = ({ data, schema, stats }) => {
 
   // Groupings for reference dashboard cards
   const chart1Data = useMemo(() => getGroupedChartData(catPartner, catSize, null, 'count'), [filteredData, catPartner, catSize]);
-  const chart2Data = useMemo(() => getGroupedChartData(catPartner, catStage, null, 'count'), [filteredData, catPartner, catStage]);
   
+  // Composed Volume/Value Chart: Category vs volume count & value sum
+  const composedData = useMemo(() => {
+    if (!catStage) return [];
+    const groups = {};
+    filteredData.forEach(row => {
+      if (!row) return;
+      const key = String(row[catStage] || 'Unknown');
+      if (!groups[key]) {
+        groups[key] = { name: key, count: 0, sum: 0 };
+      }
+      groups[key].count += 1;
+      groups[key].sum += primaryNum ? (Number(row[primaryNum]) || 0) : 0;
+    });
+    return Object.entries(groups).map(([name, obj]) => ({
+      name,
+      Count: obj.count,
+      Average: obj.count > 0 ? parseFloat((obj.sum / obj.count).toFixed(1)) : 0
+    })).slice(0, 8);
+  }, [filteredData, catStage, primaryNum]);
+
   const donutData = useMemo(() => {
     const counts = {};
     filteredData.forEach(row => {
+      if (!row) return;
       const val = String(row[catRegion] || 'Central');
       counts[val] = (counts[val] || 0) + 1;
     });
     return Object.entries(counts).map(([name, value]) => ({ name, value })).slice(0, 4);
   }, [filteredData, catRegion]);
 
-  const chart4Data = useMemo(() => getGroupedChartData(dateCol || catStage, catStage, null, 'count'), [filteredData, dateCol, catStage]);
+  // Line Graph data: Sum of primary numerical field over chronological dates
+  const lineChartData = useMemo(() => {
+    const xCol = dateCol || catStage;
+    if (!xCol) return [];
+    const groups = {};
+    filteredData.forEach(row => {
+      if (!row) return;
+      const nameVal = String(row[xCol] || 'Unknown');
+      const val = primaryNum ? Number(row[primaryNum]) : 1;
+      groups[nameVal] = (groups[nameVal] || 0) + (isNaN(val) ? 0 : val);
+    });
+    const arr = Object.entries(groups).map(([name, value]) => ({ name, value }));
+    if (dateCol) {
+      return arr.sort((a, b) => new Date(a.name).getTime() - new Date(b.name).getTime());
+    }
+    return arr;
+  }, [filteredData, dateCol, catStage, primaryNum]);
+
   const chart5Data = useMemo(() => getGroupedChartData(catRegion, catSize, null, 'count'), [filteredData, catRegion, catSize]);
-  const chart6Data = useMemo(() => getGroupedChartData(catStage, null, null, 'count'), [filteredData, catStage]);
-  const chart7Data = useMemo(() => getGroupedChartData(catPartner, catSize, primaryNum, 'mean'), [filteredData, catPartner, catSize, primaryNum]);
+
+  // Funnel Chart data: sorted stages by count
+  const funnelData = useMemo(() => {
+    const counts = {};
+    filteredData.forEach(row => {
+      if (!row) return;
+      const val = String(row[catStage] || 'Prospect');
+      counts[val] = (counts[val] || 0) + 1;
+    });
+    return Object.entries(counts)
+      .map(([name, value]) => ({ name, value }))
+      .sort((a, b) => b.value - a.value)
+      .slice(0, 5);
+  }, [filteredData, catStage]);
+
+  // Scatter Plot data: primaryNum (x) vs secondaryNum (y)
+  const scatterData = useMemo(() => {
+    if (!primaryNum) return [];
+    return filteredData
+      .map((row, idx) => ({
+        x: parseFloat(Number(row[primaryNum]).toFixed(1)) || 0,
+        y: parseFloat(Number(row[secondaryNum || primaryNum]).toFixed(1)) || idx,
+        name: String(row[catStage] || `Row ${idx}`)
+      }))
+      .filter(item => item.x > 0 || item.y > 0)
+      .slice(0, 75);
+  }, [filteredData, primaryNum, secondaryNum, catStage]);
+
   const chart8Data = useMemo(() => getGroupedChartData(catStage, catPartner, primaryNum, 'sum'), [filteredData, catStage, catPartner, primaryNum]);
   const chart9Data = useMemo(() => getGroupedChartData(catPartner, catSize, primaryNum, 'mean'), [filteredData, catPartner, catSize, primaryNum]);
   const chart10Data = useMemo(() => getGroupedChartData(catSize, null, primaryNum, 'sum'), [filteredData, catSize, primaryNum]);
@@ -159,6 +245,7 @@ export const Dashboard = ({ data, schema, stats }) => {
   const totalRevenue = useMemo(() => {
     if (!primaryNum) return 0;
     return filteredData.reduce((acc, row) => {
+      if (!row) return acc;
       const val = Number(row[primaryNum]);
       return acc + (isNaN(val) ? 0 : val);
     }, 0);
@@ -173,10 +260,199 @@ export const Dashboard = ({ data, schema, stats }) => {
     return `$${val.toLocaleString()}`;
   };
 
+  // Helper to render card header with Zoom button
+  const renderCardHeader = (title, chartId, renderFn) => (
+    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.4rem', width: '100%' }}>
+      <span style={{ fontSize: '0.7rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+        {title}
+      </span>
+      <button 
+        type="button"
+        onClick={() => setZoomedChart({ id: chartId, title, render: renderFn })}
+        style={{ 
+          background: 'transparent', 
+          border: 'none', 
+          color: 'var(--text-muted)', 
+          cursor: 'pointer', 
+          padding: '2px', 
+          borderRadius: '4px',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center'
+        }}
+        title="Maximize Chart"
+      >
+        <Maximize2 size={12} />
+      </button>
+    </div>
+  );
+
+  // Chart rendering functions (passed to modal zoom)
+  const renderChart1 = (isZoomed = false) => (
+    <ResponsiveContainer width="100%" height="100%">
+      <BarChart data={chart1Data.data} margin={{ top: 5, right: 5, left: isZoomed ? 0 : -25, bottom: 0 }}>
+        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--border-color)" />
+        <XAxis dataKey="name" stroke="var(--text-muted)" fontSize={isZoomed ? 10 : 8} />
+        <YAxis stroke="var(--text-muted)" fontSize={isZoomed ? 10 : 8} />
+        <Tooltip wrapperStyle={{ fontSize: isZoomed ? 11 : 9 }} />
+        {isZoomed && <Legend wrapperStyle={{ fontSize: 11 }} />}
+        {chart1Data.keys.map((k, i) => (
+          <Bar key={k} dataKey={k} fill={COLORS[i % COLORS.length]} radius={[2, 2, 0, 0]} />
+        ))}
+      </BarChart>
+    </ResponsiveContainer>
+  );
+
+  const renderComposedChart = (isZoomed = false) => (
+    <ResponsiveContainer width="100%" height="100%">
+      <ComposedChart data={composedData} margin={{ top: 5, right: 5, left: isZoomed ? 0 : -25, bottom: 0 }}>
+        <CartesianGrid strokeDasharray="3 3" stroke="var(--border-color)" vertical={false} />
+        <XAxis dataKey="name" stroke="var(--text-muted)" fontSize={isZoomed ? 10 : 8} />
+        <YAxis yAxisId="left" stroke="var(--text-muted)" fontSize={isZoomed ? 10 : 8} />
+        <YAxis yAxisId="right" orientation="right" stroke="var(--text-muted)" fontSize={isZoomed ? 10 : 8} />
+        <Tooltip wrapperStyle={{ fontSize: isZoomed ? 11 : 9 }} />
+        {isZoomed && <Legend wrapperStyle={{ fontSize: 11 }} />}
+        <Bar yAxisId="left" dataKey="Count" name="Opp Count" fill="var(--primary)" radius={[2, 2, 0, 0]} barSize={isZoomed ? 20 : 10} />
+        <Line yAxisId="right" type="monotone" dataKey="Average" name={`Avg ${primaryNum || 'Revenue'}`} stroke="var(--secondary)" strokeWidth={2} dot={{ r: 2 }} />
+      </ComposedChart>
+    </ResponsiveContainer>
+  );
+
+  const renderChart3 = (isZoomed = false) => (
+    <ResponsiveContainer width="100%" height="100%">
+      <PieChart>
+        <Pie
+          data={donutData}
+          cx="50%"
+          cy="50%"
+          innerRadius={isZoomed ? 30 : 18}
+          outerRadius={isZoomed ? 60 : 30}
+          paddingAngle={2}
+          dataKey="value"
+        >
+          {donutData.map((entry, index) => (
+            <Cell key={`cell-${index}`} fill={COLORS[(index + 3) % COLORS.length]} />
+          ))}
+        </Pie>
+        <Tooltip wrapperStyle={{ fontSize: isZoomed ? 11 : 9 }} />
+        {isZoomed && <Legend wrapperStyle={{ fontSize: 11 }} />}
+      </PieChart>
+    </ResponsiveContainer>
+  );
+
+  const renderChart4 = (isZoomed = false) => (
+    <ResponsiveContainer width="100%" height="100%">
+      <LineChart data={lineChartData} margin={{ top: 5, right: 5, left: isZoomed ? 0 : -25, bottom: 0 }}>
+        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--border-color)" />
+        <XAxis dataKey="name" stroke="var(--text-muted)" fontSize={isZoomed ? 10 : 8} />
+        <YAxis stroke="var(--text-muted)" fontSize={isZoomed ? 10 : 8} />
+        <Tooltip wrapperStyle={{ fontSize: isZoomed ? 11 : 9 }} />
+        {isZoomed && <Legend wrapperStyle={{ fontSize: 11 }} />}
+        <Line 
+          type="monotone" 
+          dataKey="value" 
+          stroke="var(--secondary)" 
+          strokeWidth={isZoomed ? 3 : 2} 
+          dot={{ r: isZoomed ? 4 : 2, fill: 'var(--secondary)' }} 
+        />
+      </LineChart>
+    </ResponsiveContainer>
+  );
+
+  const renderChart5 = (isZoomed = false) => (
+    <ResponsiveContainer width="100%" height="100%">
+      <BarChart data={chart5Data.data} layout="vertical" margin={{ top: 5, right: 5, left: isZoomed ? 0 : -15, bottom: 5 }}>
+        <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="var(--border-color)" />
+        <XAxis type="number" stroke="var(--text-muted)" fontSize={isZoomed ? 10 : 8} />
+        <YAxis dataKey="name" type="category" stroke="var(--text-muted)" fontSize={isZoomed ? 10 : 8} />
+        <Tooltip wrapperStyle={{ fontSize: isZoomed ? 11 : 9 }} />
+        {isZoomed && <Legend wrapperStyle={{ fontSize: 11 }} />}
+        {chart5Data.keys.map((k, i) => (
+          <Bar key={k} dataKey={k} fill={COLORS[(i + 4) % COLORS.length]} radius={[0, 2, 2, 0]} />
+        ))}
+      </BarChart>
+    </ResponsiveContainer>
+  );
+
+  const renderChart6 = (isZoomed = false) => (
+    <ResponsiveContainer width="100%" height="100%">
+      <FunnelChart margin={{ top: 5, right: isZoomed ? 40 : 15, left: isZoomed ? 40 : 15, bottom: 5 }}>
+        <Tooltip wrapperStyle={{ fontSize: isZoomed ? 11 : 9 }} />
+        <Funnel dataKey="value" data={funnelData} isAnimationActive>
+          <LabelList position="right" fill="var(--text-muted)" stroke="none" dataKey="name" fontSize={isZoomed ? 10 : 7} />
+          {funnelData.map((entry, index) => (
+            <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+          ))}
+        </Funnel>
+      </FunnelChart>
+    </ResponsiveContainer>
+  );
+
+  const renderChart7 = (isZoomed = false) => (
+    <ResponsiveContainer width="100%" height="100%">
+      <ScatterChart margin={{ top: 5, right: 5, left: isZoomed ? 0 : -20, bottom: 5 }}>
+        <CartesianGrid strokeDasharray="3 3" stroke="var(--border-color)" />
+        <XAxis type="number" dataKey="x" name={primaryNum} stroke="var(--text-muted)" fontSize={isZoomed ? 10 : 8} />
+        <YAxis type="number" dataKey="y" name={secondaryNum || 'Index'} stroke="var(--text-muted)" fontSize={isZoomed ? 10 : 8} />
+        <ZAxis type="number" range={[isZoomed ? 60 : 40, isZoomed ? 60 : 40]} />
+        <Tooltip cursor={{ strokeDasharray: '3 3' }} wrapperStyle={{ fontSize: isZoomed ? 11 : 9 }} />
+        {isZoomed && <Legend wrapperStyle={{ fontSize: 11 }} />}
+        <Scatter name="Distribution" data={scatterData}>
+          {scatterData.map((entry, index) => (
+            <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+          ))}
+        </Scatter>
+      </ScatterChart>
+    </ResponsiveContainer>
+  );
+
+  const renderChart8 = (isZoomed = false) => (
+    <ResponsiveContainer width="100%" height="100%">
+      <BarChart data={chart8Data.data} margin={{ top: 5, right: 5, left: isZoomed ? 0 : -15, bottom: 0 }}>
+        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--border-color)" />
+        <XAxis dataKey="name" stroke="var(--text-muted)" fontSize={isZoomed ? 10 : 8} />
+        <YAxis stroke="var(--text-muted)" fontSize={isZoomed ? 10 : 8} />
+        <Tooltip wrapperStyle={{ fontSize: isZoomed ? 11 : 9 }} />
+        {isZoomed && <Legend wrapperStyle={{ fontSize: 11 }} />}
+        {chart8Data.keys.map((k, i) => (
+          <Bar key={k} dataKey={k} fill={COLORS[i % COLORS.length]} radius={[2, 2, 0, 0]} />
+        ))}
+      </BarChart>
+    </ResponsiveContainer>
+  );
+
+  const renderChart9 = (isZoomed = false) => (
+    <ResponsiveContainer width="100%" height="100%">
+      <BarChart data={chart9Data.data} layout="vertical" margin={{ top: 5, right: 5, left: isZoomed ? 0 : -15, bottom: 5 }}>
+        <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="var(--border-color)" />
+        <XAxis type="number" stroke="var(--text-muted)" fontSize={isZoomed ? 10 : 8} />
+        <YAxis dataKey="name" type="category" stroke="var(--text-muted)" fontSize={isZoomed ? 10 : 8} />
+        <Tooltip wrapperStyle={{ fontSize: isZoomed ? 11 : 9 }} />
+        {isZoomed && <Legend wrapperStyle={{ fontSize: 11 }} />}
+        {chart9Data.keys.map((k, i) => (
+          <Bar key={k} dataKey={k} fill={COLORS[(i + 3) % COLORS.length]} radius={[0, 2, 2, 0]} />
+        ))}
+      </BarChart>
+    </ResponsiveContainer>
+  );
+
+  const renderChart10 = (isZoomed = false) => (
+    <ResponsiveContainer width="100%" height="100%">
+      <BarChart data={chart10Data.data} margin={{ top: 5, right: 5, left: isZoomed ? 0 : -20, bottom: 0 }}>
+        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--border-color)" />
+        <XAxis dataKey="name" stroke="var(--text-muted)" fontSize={isZoomed ? 10 : 8} />
+        <YAxis stroke="var(--text-muted)" fontSize={isZoomed ? 10 : 8} />
+        <Tooltip wrapperStyle={{ fontSize: isZoomed ? 11 : 9 }} />
+        {isZoomed && <Legend wrapperStyle={{ fontSize: 11 }} />}
+        <Bar dataKey="Count" fill="var(--secondary)" radius={[2, 2, 0, 0]} />
+      </BarChart>
+    </ResponsiveContainer>
+  );
+
   return (
     <div className="animate-fade-in" style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
       
-      {/* Workspace Filters header */}
+      {/* Workspace Filters cockpit */}
       <div className="glass-card" style={{ padding: '1.25rem 1.75rem' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.85rem' }}>
           <h3 style={{ fontSize: '1.05rem', fontWeight: 800, display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
@@ -241,217 +517,169 @@ export const Dashboard = ({ data, schema, stats }) => {
         </div>
       </div>
 
-      {/* 13-Card Executive Grid Layout */}
-      <div className="executive-dashboard-grid">
+      {/* 4 Premium Top KPI Cards (Unique & Attractive, Green glowing, matching your reference layout) */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '1.25rem', width: '100%', marginBottom: '0.5rem' }}>
         
-        {/* ROW 1: 5 Columns (Opportunity Count, Chart 1, Chart 2, Chart 3, Revenue) */}
-        
-        {/* Card 1: KPI Opportunity Count */}
-        <div className="glass-card" style={{ gridColumn: 'span 2', display: 'flex', flexDirection: 'column', justifyContent: 'center', textAlign: 'center', minHeight: '130px' }}>
-          <span style={{ fontSize: '0.78rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-            Opportunity Count
-          </span>
-          <strong style={{ fontSize: '2.5rem', fontWeight: 800, margin: '0.5rem 0', color: 'var(--text-main)' }}>
-            {totalOpportunityCount}
+        {/* KPI 1: Opp Count */}
+        <div className="glass-card hoverable animate-scale-in" style={{ 
+          padding: '1.4rem 1.25rem', 
+          borderRadius: '14px', 
+          border: '1px solid rgba(132, 204, 22, 0.22)', 
+          background: 'linear-gradient(135deg, var(--panel-bg-solid) 0%, rgba(132, 204, 22, 0.04) 100%)',
+          textAlign: 'center',
+          boxShadow: '0 8px 30px rgba(132, 204, 22, 0.05)',
+          position: 'relative',
+          overflow: 'hidden'
+        }}>
+          <div style={{ position: 'absolute', top: 0, left: 0, width: '4px', height: '100%', background: 'var(--secondary)' }} />
+          <strong style={{ display: 'block', fontSize: '1.85rem', fontWeight: 800, color: 'var(--text-main)', marginBottom: '0.35rem', letterSpacing: '-0.02em' }}>
+            {totalOpportunityCount.toLocaleString()}
           </strong>
+          <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 700, letterSpacing: '0.08em' }}>
+            Total Opportunities
+          </span>
         </div>
 
-        {/* Card 2: Opportunity Count by Partner, Size */}
-        <div className="glass-card" style={{ gridColumn: 'span 3', minHeight: '130px', padding: '1rem' }}>
-          <span style={{ fontSize: '0.7rem', fontWeight: 700, color: 'var(--text-muted)', display: 'block', textTransform: 'uppercase', marginBottom: '0.4rem' }}>
-            Opportunity Count BY {catPartner.toUpperCase()}, {catSize.toUpperCase()}
-          </span>
-          <div style={{ width: '100%', height: 90 }}>
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={chart1Data.data} margin={{ top: 5, right: 5, left: -25, bottom: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--border-color)" />
-                <XAxis dataKey="name" stroke="var(--text-muted)" fontSize={8} />
-                <YAxis stroke="var(--text-muted)" fontSize={8} />
-                <Tooltip wrapperStyle={{ fontSize: 9 }} />
-                {chart1Data.keys.map((k, i) => (
-                  <Bar key={k} dataKey={k} fill={COLORS[i % COLORS.length]} radius={[2, 2, 0, 0]} />
-                ))}
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
-        </div>
-
-        {/* Card 3: Opportunity Count by Partner, Stage */}
-        <div className="glass-card" style={{ gridColumn: 'span 3', minHeight: '130px', padding: '1rem' }}>
-          <span style={{ fontSize: '0.7rem', fontWeight: 700, color: 'var(--text-muted)', display: 'block', textTransform: 'uppercase', marginBottom: '0.4rem' }}>
-            Opportunity Count BY {catPartner.toUpperCase()}, {catStage.toUpperCase()}
-          </span>
-          <div style={{ width: '100%', height: 90 }}>
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={chart2Data.data} margin={{ top: 5, right: 5, left: -25, bottom: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--border-color)" />
-                <XAxis dataKey="name" stroke="var(--text-muted)" fontSize={8} />
-                <YAxis stroke="var(--text-muted)" fontSize={8} />
-                <Tooltip wrapperStyle={{ fontSize: 9 }} />
-                {chart2Data.keys.map((k, i) => (
-                  <Bar key={k} dataKey={k} fill={COLORS[(i + 2) % COLORS.length]} radius={[2, 2, 0, 0]} />
-                ))}
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
-        </div>
-
-        {/* Card 4: Opportunity Count by Region (Donut) */}
-        <div className="glass-card" style={{ gridColumn: 'span 2', minHeight: '130px', padding: '1rem', display: 'flex', flexDirection: 'column' }}>
-          <span style={{ fontSize: '0.7rem', fontWeight: 700, color: 'var(--text-muted)', display: 'block', textTransform: 'uppercase', marginBottom: '0.2rem' }}>
-            BY {catRegion.toUpperCase()}
-          </span>
-          <div style={{ width: '100%', height: 80, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <ResponsiveContainer width="100%" height="100%">
-              <PieChart>
-                <Pie
-                  data={donutData}
-                  cx="50%"
-                  cy="50%"
-                  innerRadius={18}
-                  outerRadius={30}
-                  paddingAngle={2}
-                  dataKey="value"
-                >
-                  {donutData.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={COLORS[(index + 3) % COLORS.length]} />
-                  ))}
-                </Pie>
-                <Tooltip wrapperStyle={{ fontSize: 9 }} />
-              </PieChart>
-            </ResponsiveContainer>
-          </div>
-        </div>
-
-        {/* Card 5: KPI Revenue */}
-        <div className="glass-card" style={{ gridColumn: 'span 2', display: 'flex', flexDirection: 'column', justifyContent: 'center', textAlign: 'center', minHeight: '130px' }}>
-          <span style={{ fontSize: '0.78rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-            Revenue ({numName})
-          </span>
-          <strong style={{ fontSize: '2.1rem', fontWeight: 800, margin: '0.5rem 0', color: 'var(--secondary)' }}>
+        {/* KPI 2: Total Revenue */}
+        <div className="glass-card hoverable animate-scale-in" style={{ 
+          padding: '1.4rem 1.25rem', 
+          borderRadius: '14px', 
+          border: '1px solid rgba(132, 204, 22, 0.22)', 
+          background: 'linear-gradient(135deg, var(--panel-bg-solid) 0%, rgba(132, 204, 22, 0.04) 100%)',
+          textAlign: 'center',
+          boxShadow: '0 8px 30px rgba(132, 204, 22, 0.05)',
+          position: 'relative',
+          overflow: 'hidden'
+        }}>
+          <div style={{ position: 'absolute', top: 0, left: 0, width: '4px', height: '100%', background: 'var(--secondary)' }} />
+          <strong style={{ display: 'block', fontSize: '1.85rem', fontWeight: 800, color: 'var(--secondary)', marginBottom: '0.35rem', letterSpacing: '-0.02em' }}>
             {formatCurrency(totalRevenue)}
           </strong>
+          <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 700, letterSpacing: '0.08em' }}>
+            Total {primaryNum || 'Revenue'}
+          </span>
         </div>
 
-        {/* ROW 2: 4 Columns (Stacked Month, Horiz Region, Opportunity Stage, Average Revenue) */}
-
-        {/* Card 6: Opportunity count by month stacked stage */}
-        <div className="glass-card" style={{ gridColumn: 'span 4', minHeight: '230px', padding: '1.25rem' }}>
-          <span style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-muted)', display: 'block', textTransform: 'uppercase', marginBottom: '0.75rem' }}>
-            Opportunity Count BY MONTH / {catStage.toUpperCase()} (100% Stacked)
+        {/* KPI 3: Avg Value */}
+        <div className="glass-card hoverable animate-scale-in" style={{ 
+          padding: '1.4rem 1.25rem', 
+          borderRadius: '14px', 
+          border: '1px solid rgba(132, 204, 22, 0.22)', 
+          background: 'linear-gradient(135deg, var(--panel-bg-solid) 0%, rgba(132, 204, 22, 0.04) 100%)',
+          textAlign: 'center',
+          boxShadow: '0 8px 30px rgba(132, 204, 22, 0.05)',
+          position: 'relative',
+          overflow: 'hidden'
+        }}>
+          <div style={{ position: 'absolute', top: 0, left: 0, width: '4px', height: '100%', background: 'var(--secondary)' }} />
+          <strong style={{ display: 'block', fontSize: '1.85rem', fontWeight: 800, color: 'var(--text-main)', marginBottom: '0.35rem', letterSpacing: '-0.02em' }}>
+            {totalOpportunityCount > 0 ? formatCurrency(Math.round(totalRevenue / totalOpportunityCount)) : '$0'}
+          </strong>
+          <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 700, letterSpacing: '0.08em' }}>
+            Average Deal Value
           </span>
+        </div>
+
+        {/* KPI 4: Secondary metric sum or Factored Pipeline */}
+        <div className="glass-card hoverable animate-scale-in" style={{ 
+          padding: '1.4rem 1.25rem', 
+          borderRadius: '14px', 
+          border: '1px solid rgba(132, 204, 22, 0.22)', 
+          background: 'linear-gradient(135deg, var(--panel-bg-solid) 0%, rgba(132, 204, 22, 0.04) 100%)',
+          textAlign: 'center',
+          boxShadow: '0 8px 30px rgba(132, 204, 22, 0.05)',
+          position: 'relative',
+          overflow: 'hidden'
+        }}>
+          <div style={{ position: 'absolute', top: 0, left: 0, width: '4px', height: '100%', background: 'var(--secondary)' }} />
+          <strong style={{ display: 'block', fontSize: '1.85rem', fontWeight: 800, color: 'var(--secondary)', marginBottom: '0.35rem', letterSpacing: '-0.02em' }}>
+            {secondaryNum && secondaryNum !== primaryNum ? getSum(secondaryNum).toLocaleString() : formatCurrency(factoredRevenue)}
+          </strong>
+          <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 700, letterSpacing: '0.08em' }}>
+            {secondaryNum && secondaryNum !== primaryNum ? `Total ${secondaryNum}` : 'Factored Pipeline (75%)'}
+          </span>
+        </div>
+
+      </div>
+
+      {/* Grid Layout (Refined to 3 columns in row 1 to fit composed chart and remove redundancies) */}
+      <div className="executive-dashboard-grid">
+        
+        {/* ROW 1: 3 Columns (Chart 1, Composed Value/Volume Chart, Chart 3 Donut) */}
+
+        {/* Card 2: Opportunity Count by Partner, Size */}
+        <div className="glass-card" style={{ gridColumn: 'span 4', minHeight: '180px', padding: '1.25rem', display: 'flex', flexDirection: 'column' }}>
+          {renderCardHeader(`Opp Volume BY ${catPartner}, ${catSize}`, 'chart1', renderChart1)}
+          <div style={{ width: '100%', flex: 1, minHeight: 0 }}>
+            {renderChart1()}
+          </div>
+        </div>
+
+        {/* Card 3: NEW Composed Volume & Average Value Chart (Attractive composed model) */}
+        <div className="glass-card" style={{ gridColumn: 'span 4', minHeight: '180px', padding: '1.25rem', display: 'flex', flexDirection: 'column' }}>
+          {renderCardHeader(`Volume & Avg Value BY ${catStage}`, 'composedChart', renderComposedChart)}
+          <div style={{ width: '100%', flex: 1, minHeight: 0 }}>
+            {renderComposedChart()}
+          </div>
+        </div>
+
+        {/* Card 4: Donut Share */}
+        <div className="glass-card" style={{ gridColumn: 'span 4', minHeight: '180px', padding: '1.25rem', display: 'flex', flexDirection: 'column' }}>
+          {renderCardHeader(`Opportunity Share BY ${catRegion}`, 'chart3', renderChart3)}
+          <div style={{ width: '100%', flex: 1, minHeight: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            {renderChart3()}
+          </div>
+        </div>
+
+        {/* ROW 2: 4 Columns (Line Graph, Horiz Region, Funnel Chart, Scatter Plot) */}
+
+        {/* Card 6: Timeline Line Graph */}
+        <div className="glass-card" style={{ gridColumn: 'span 4', minHeight: '230px', padding: '1.25rem', display: 'flex', flexDirection: 'column' }}>
+          {renderCardHeader(`Opportunity Value Timeline Trend`, 'chart4', renderChart4)}
           <div style={{ width: '100%', height: 160 }}>
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={chart4Data.data} margin={{ top: 5, right: 5, left: -25, bottom: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--border-color)" />
-                <XAxis dataKey="name" stroke="var(--text-muted)" fontSize={8} />
-                <YAxis stroke="var(--text-muted)" fontSize={8} />
-                <Tooltip wrapperStyle={{ fontSize: 9 }} />
-                {chart4Data.keys.map((k, i) => (
-                  <Bar key={k} dataKey={k} stackId="a" fill={COLORS[i % COLORS.length]} />
-                ))}
-              </BarChart>
-            </ResponsiveContainer>
+            {renderChart4()}
           </div>
         </div>
 
         {/* Card 7: Clustered Horizontal Region by size */}
-        <div className="glass-card" style={{ gridColumn: 'span 3', minHeight: '230px', padding: '1.25rem' }}>
-          <span style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-muted)', display: 'block', textTransform: 'uppercase', marginBottom: '0.75rem' }}>
-            BY {catRegion.toUpperCase()}, {catSize.toUpperCase()} (Horizontal)
-          </span>
+        <div className="glass-card" style={{ gridColumn: 'span 3', minHeight: '230px', padding: '1.25rem', display: 'flex', flexDirection: 'column' }}>
+          {renderCardHeader(`BY ${catRegion}, ${catSize} (Horizontal)`, 'chart5', renderChart5)}
           <div style={{ width: '100%', height: 160 }}>
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={chart5Data.data} layout="vertical" margin={{ top: 5, right: 5, left: -15, bottom: 5 }}>
-                <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="var(--border-color)" />
-                <XAxis type="number" stroke="var(--text-muted)" fontSize={8} />
-                <YAxis dataKey="name" type="category" stroke="var(--text-muted)" fontSize={8} />
-                <Tooltip wrapperStyle={{ fontSize: 9 }} />
-                {chart5Data.keys.map((k, i) => (
-                  <Bar key={k} dataKey={k} fill={COLORS[(i + 4) % COLORS.length]} radius={[0, 2, 2, 0]} />
-                ))}
-              </BarChart>
-            </ResponsiveContainer>
+            {renderChart5()}
           </div>
         </div>
 
-        {/* Card 8: Opp Count by Stage */}
-        <div className="glass-card" style={{ gridColumn: 'span 2', minHeight: '230px', padding: '1.25rem' }}>
-          <span style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-muted)', display: 'block', textTransform: 'uppercase', marginBottom: '0.75rem' }}>
-            BY {catStage.toUpperCase()}
-          </span>
+        {/* Card 8: Sales Funnel Progression */}
+        <div className="glass-card" style={{ gridColumn: 'span 2', minHeight: '230px', padding: '1.25rem', display: 'flex', flexDirection: 'column' }}>
+          {renderCardHeader(`Sales Stage Funnel`, 'chart6', renderChart6)}
           <div style={{ width: '100%', height: 160 }}>
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={chart6Data.data} layout="vertical" margin={{ top: 5, right: 5, left: -20, bottom: 5 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="var(--border-color)" horizontal={false} />
-                <XAxis type="number" stroke="var(--text-muted)" fontSize={8} />
-                <YAxis dataKey="name" type="category" stroke="var(--text-muted)" fontSize={8} />
-                <Tooltip wrapperStyle={{ fontSize: 9 }} />
-                <Bar dataKey="Count" fill="var(--primary)" radius={[0, 4, 4, 0]} />
-              </BarChart>
-            </ResponsiveContainer>
+            {renderChart6()}
           </div>
         </div>
 
-        {/* Card 9: Average Revenue by Partner Driven, size */}
-        <div className="glass-card" style={{ gridColumn: 'span 3', minHeight: '230px', padding: '1.25rem' }}>
-          <span style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-muted)', display: 'block', textTransform: 'uppercase', marginBottom: '0.75rem' }}>
-            Average Revenue BY {catPartner.toUpperCase()}
-          </span>
+        {/* Card 9: Scatter Plot distribution */}
+        <div className="glass-card" style={{ gridColumn: 'span 3', minHeight: '230px', padding: '1.25rem', display: 'flex', flexDirection: 'column' }}>
+          {renderCardHeader(`Metric Distribution Scatter`, 'chart7', renderChart7)}
           <div style={{ width: '100%', height: 160 }}>
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={chart7Data.data} margin={{ top: 5, right: 5, left: -20, bottom: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--border-color)" />
-                <XAxis dataKey="name" stroke="var(--text-muted)" fontSize={8} />
-                <YAxis stroke="var(--text-muted)" fontSize={8} />
-                <Tooltip wrapperStyle={{ fontSize: 9 }} />
-                {chart7Data.keys.map((k, i) => (
-                  <Bar key={k} dataKey={k} fill={COLORS[(i + 1) % COLORS.length]} radius={[2, 2, 0, 0]} />
-                ))}
-              </BarChart>
-            </ResponsiveContainer>
+            {renderChart7()}
           </div>
         </div>
 
         {/* ROW 3: 4 Columns (Revenue by sales stage, Average Partner Revenue, Factored Revenue KPI, Factored Revenue sizing) */}
 
         {/* Card 10: Revenue by Sales Stage */}
-        <div className="glass-card" style={{ gridColumn: 'span 4', minHeight: '230px', padding: '1.25rem' }}>
-          <span style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-muted)', display: 'block', textTransform: 'uppercase', marginBottom: '0.75rem' }}>
-            Revenue BY {catStage.toUpperCase()}, {catPartner.toUpperCase()}
-          </span>
+        <div className="glass-card" style={{ gridColumn: 'span 4', minHeight: '230px', padding: '1.25rem', display: 'flex', flexDirection: 'column' }}>
+          {renderCardHeader(`Revenue BY ${catStage}, ${catPartner}`, 'chart8', renderChart8)}
           <div style={{ width: '100%', height: 160 }}>
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={chart8Data.data} margin={{ top: 5, right: 5, left: -15, bottom: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--border-color)" />
-                <XAxis dataKey="name" stroke="var(--text-muted)" fontSize={8} />
-                <YAxis stroke="var(--text-muted)" fontSize={8} />
-                <Tooltip wrapperStyle={{ fontSize: 9 }} />
-                {chart8Data.keys.map((k, i) => (
-                  <Bar key={k} dataKey={k} fill={COLORS[i % COLORS.length]} radius={[2, 2, 0, 0]} />
-                ))}
-              </BarChart>
-            </ResponsiveContainer>
+            {renderChart8()}
           </div>
         </div>
 
         {/* Card 11: Average Revenue Horizontal */}
-        <div className="glass-card" style={{ gridColumn: 'span 3', minHeight: '230px', padding: '1.25rem' }}>
-          <span style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-muted)', display: 'block', textTransform: 'uppercase', marginBottom: '0.75rem' }}>
-            Average Revenue BY {catPartner.toUpperCase()}, {catSize.toUpperCase()}
-          </span>
+        <div className="glass-card" style={{ gridColumn: 'span 3', minHeight: '230px', padding: '1.25rem', display: 'flex', flexDirection: 'column' }}>
+          {renderCardHeader(`Avg Revenue BY ${catPartner}, ${catSize}`, 'chart9', renderChart9)}
           <div style={{ width: '100%', height: 160 }}>
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={chart9Data.data} layout="vertical" margin={{ top: 5, right: 5, left: -15, bottom: 5 }}>
-                <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="var(--border-color)" />
-                <XAxis type="number" stroke="var(--text-muted)" fontSize={8} />
-                <YAxis dataKey="name" type="category" stroke="var(--text-muted)" fontSize={8} />
-                <Tooltip wrapperStyle={{ fontSize: 9 }} />
-                {chart9Data.keys.map((k, i) => (
-                  <Bar key={k} dataKey={k} fill={COLORS[(i + 3) % COLORS.length]} radius={[0, 2, 2, 0]} />
-                ))}
-              </BarChart>
-            </ResponsiveContainer>
+            {renderChart9()}
           </div>
         </div>
 
@@ -469,24 +697,93 @@ export const Dashboard = ({ data, schema, stats }) => {
         </div>
 
         {/* Card 13: Factored Revenue by Size */}
-        <div className="glass-card" style={{ gridColumn: 'span 3', minHeight: '230px', padding: '1.25rem' }}>
-          <span style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-muted)', display: 'block', textTransform: 'uppercase', marginBottom: '0.75rem' }}>
-            Factored Revenue BY {catSize.toUpperCase()}
-          </span>
+        <div className="glass-card" style={{ gridColumn: 'span 3', minHeight: '230px', padding: '1.25rem', display: 'flex', flexDirection: 'column' }}>
+          {renderCardHeader(`Factored Revenue BY ${catSize}`, 'chart10', renderChart10)}
           <div style={{ width: '100%', height: 160 }}>
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={chart10Data.data} margin={{ top: 5, right: 5, left: -20, bottom: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--border-color)" />
-                <XAxis dataKey="name" stroke="var(--text-muted)" fontSize={8} />
-                <YAxis stroke="var(--text-muted)" fontSize={8} />
-                <Tooltip wrapperStyle={{ fontSize: 9 }} />
-                <Bar dataKey="Count" fill="var(--secondary)" radius={[2, 2, 0, 0]} />
-              </BarChart>
-            </ResponsiveContainer>
+            {renderChart10()}
           </div>
         </div>
 
       </div>
+
+      {/* Lightbox Zoom Modal Overlay */}
+      {zoomedChart && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          width: '100vw',
+          height: '100vh',
+          backgroundColor: 'rgba(15, 23, 42, 0.65)',
+          backdropFilter: 'blur(12px)',
+          zIndex: 9999,
+          display: 'flex',
+          justifyContent: 'center',
+          alignItems: 'center',
+          animation: 'fadeIn 0.2s ease-out'
+        }}>
+          <div className="glass-card animate-scale-in" style={{
+            width: '85%',
+            maxWidth: '1000px',
+            height: '75%',
+            maxHeight: '650px',
+            padding: '2.5rem',
+            position: 'relative',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '1.5rem',
+            boxShadow: 'var(--shadow-lg)',
+            border: '1px solid var(--border-color)',
+            background: 'var(--panel-bg-solid)'
+          }}>
+            {/* Modal Header */}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <h3 style={{ fontSize: '1.25rem', fontWeight: 800, color: 'var(--text-main)', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <TrendingUp size={20} style={{ color: 'var(--secondary)' }} />
+                {zoomedChart.title}
+              </h3>
+              <button 
+                type="button"
+                onClick={() => setZoomedChart(null)}
+                style={{ 
+                  background: 'var(--panel-bg-solid)', 
+                  border: '1px solid var(--border-color)', 
+                  borderRadius: '50%', 
+                  width: '32px', 
+                  height: '32px', 
+                  display: 'flex', 
+                  alignItems: 'center', 
+                  justifyContent: 'center', 
+                  cursor: 'pointer', 
+                  color: 'var(--text-main)',
+                  transition: 'all 0.2s'
+                }}
+              >
+                <X size={16} />
+              </button>
+            </div>
+            
+            {/* Modal Chart Content */}
+            <div style={{ flex: 1, width: '100%', minHeight: 0 }}>
+              {zoomedChart.render(true)}
+            </div>
+
+            {/* Modal Description Footer */}
+            <div style={{ 
+              fontSize: '0.82rem', 
+              color: 'var(--text-muted)', 
+              borderTop: '1px solid var(--border-color)', 
+              paddingTop: '1rem',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.5rem'
+            }}>
+              <Info size={14} style={{ color: 'var(--primary)' }} />
+              <span>Use your mouse cursor to hover over points, columns, or line nodes for exact metrics.</span>
+            </div>
+          </div>
+        </div>
+      )}
 
     </div>
   );

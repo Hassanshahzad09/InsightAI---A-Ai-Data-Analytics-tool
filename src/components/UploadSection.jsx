@@ -23,15 +23,15 @@ export const UploadSection = ({ onDataParsed }) => {
     e.stopPropagation();
     setDragActive(false);
     
-    if (e.dataTransfer.files && e.dataTransfer.files[0]) {
-      processFile(e.dataTransfer.files[0]);
+    if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+      processMultipleFiles(Array.from(e.dataTransfer.files));
     }
   };
 
   const handleChange = (e) => {
     e.preventDefault();
-    if (e.target.files && e.target.files[0]) {
-      processFile(e.target.files[0]);
+    if (e.target.files && e.target.files.length > 0) {
+      processMultipleFiles(Array.from(e.target.files));
     }
   };
 
@@ -39,55 +39,113 @@ export const UploadSection = ({ onDataParsed }) => {
     fileInputRef.current.click();
   };
 
-  const processFile = (file) => {
-    setError(null);
-    const fileName = file.name;
-    const extension = fileName.split('.').pop().toLowerCase();
+  const mergeDatasets = (datasets) => {
+    if (datasets.length === 0) return [];
+    if (datasets.length === 1) return datasets[0];
 
-    if (extension === 'csv') {
-      Papa.parse(file, {
-        header: true,
-        skipEmptyLines: true,
-        complete: (results) => {
-          if (results.data && results.data.length > 0) {
-            onDataParsed(results.data, fileName);
-          } else {
-            setError("The CSV file seems to be empty.");
-          }
-        },
-        error: (err) => {
-          setError(`Error parsing CSV: ${err.message}`);
+    // Collect all unique keys (columns) across all uploaded datasets
+    const allCols = new Set();
+    datasets.forEach(ds => {
+      if (ds && ds.length > 0) {
+        Object.keys(ds[0]).forEach(col => {
+          if (col) allCols.add(col);
+        });
+      }
+    });
+
+    // Merge rows, padding missing columns with empty string
+    const merged = [];
+    datasets.forEach(ds => {
+      ds.forEach(row => {
+        const newRow = {};
+        allCols.forEach(col => {
+          newRow[col] = row[col] !== undefined && row[col] !== null ? String(row[col]) : "";
+        });
+        merged.push(newRow);
+      });
+    });
+    return merged;
+  };
+
+  const processMultipleFiles = async (files) => {
+    setError(null);
+    const parsedDatasets = [];
+    const fileNames = [];
+
+    // Helper: Parse a single file and return its JSON dataset
+    const parseSingleFile = (file) => {
+      return new Promise((resolve, reject) => {
+        const fileName = file.name;
+        const extension = fileName.split('.').pop().toLowerCase();
+
+        if (extension === 'csv') {
+          Papa.parse(file, {
+            header: true,
+            skipEmptyLines: true,
+            complete: (results) => {
+              if (results.data && results.data.length > 0) {
+                resolve({ data: results.data, name: fileName });
+              } else {
+                reject(new Error(`CSV file "${fileName}" seems to be empty.`));
+              }
+            },
+            error: (err) => {
+              reject(new Error(`Error parsing CSV "${fileName}": ${err.message}`));
+            }
+          });
+        } else if (extension === 'xlsx' || extension === 'xls') {
+          const reader = new FileReader();
+          reader.onload = (e) => {
+            try {
+              const data = new Uint8Array(e.target.result);
+              const workbook = XLSX.read(data, { type: 'array' });
+              const firstSheetName = workbook.SheetNames[0];
+              const worksheet = workbook.Sheets[firstSheetName];
+              const json = XLSX.utils.sheet_to_json(worksheet, { defval: "" });
+              
+              if (json && json.length > 0) {
+                const formattedJson = json.map(row => {
+                  const newRow = {};
+                  Object.keys(row).forEach(key => {
+                    newRow[key] = row[key] !== null && row[key] !== undefined ? String(row[key]) : "";
+                  });
+                  return newRow;
+                });
+                resolve({ data: formattedJson, name: fileName });
+              } else {
+                reject(new Error(`Excel file "${fileName}" seems to be empty.`));
+              }
+            } catch (err) {
+              reject(new Error(`Error parsing Excel "${fileName}": ${err.message}`));
+            }
+          };
+          reader.onerror = () => reject(new Error(`Failed to read file "${fileName}"`));
+          reader.readAsArrayBuffer(file);
+        } else {
+          reject(new Error(`Unsupported format for "${fileName}". Use .csv, .xlsx, or .xls.`));
         }
       });
-    } else if (extension === 'xlsx' || extension === 'xls') {
-      const reader = new FileReader();
-      reader.onload = (e) => {
-        try {
-          const data = new Uint8Array(e.target.result);
-          const workbook = XLSX.read(data, { type: 'array' });
-          const firstSheetName = workbook.SheetNames[0];
-          const worksheet = workbook.Sheets[firstSheetName];
-          const json = XLSX.utils.sheet_to_json(worksheet, { defval: "" });
-          
-          if (json && json.length > 0) {
-            const formattedJson = json.map(row => {
-              const newRow = {};
-              Object.keys(row).forEach(key => {
-                newRow[key] = row[key] !== null && row[key] !== undefined ? String(row[key]) : "";
-              });
-              return newRow;
-            });
-            onDataParsed(formattedJson, fileName);
-          } else {
-            setError("The Excel file seems to be empty.");
-          }
-        } catch (err) {
-          setError(`Error parsing Excel file: ${err.message}`);
-        }
-      };
-      reader.readAsArrayBuffer(file);
-    } else {
-      setError("Unsupported file format. Please upload a .csv, .xlsx, or .xls file.");
+    };
+
+    try {
+      // Parse all files concurrently
+      const results = await Promise.all(files.map(file => parseSingleFile(file)));
+      
+      results.forEach(res => {
+        parsedDatasets.push(res.data);
+        fileNames.push(res.name);
+      });
+
+      // Merge datasets
+      const mergedData = mergeDatasets(parsedDatasets);
+      const mergedName = fileNames.length > 1 
+        ? `Merged Dataset (${fileNames.length} files: ${fileNames.map(f => f.split('.')[0]).join(', ')})`
+        : fileNames[0];
+
+      onDataParsed(mergedData, mergedName);
+
+    } catch (err) {
+      setError(err.message || "Failed to process files.");
     }
   };
 
@@ -221,7 +279,7 @@ export const UploadSection = ({ onDataParsed }) => {
     <div className="glass-card animate-fade-in" style={{ padding: '3.5rem', textAlign: 'center' }}>
       <h2 style={{ fontSize: '2rem', marginBottom: '0.5rem', fontWeight: 800, letterSpacing: '-0.03em' }}>Upload Your Dataset</h2>
       <p style={{ color: 'var(--text-muted)', marginBottom: '2.5rem', fontSize: '0.95rem' }}>
-        Import Comma-Separated Values (.csv) or Microsoft Excel (.xlsx, .xls) files.
+        Import multiple Comma-Separated Values (.csv) or Microsoft Excel (.xlsx, .xls) files to merge and analyze.
       </p>
 
       {/* Drag & Drop Area */}
@@ -235,7 +293,7 @@ export const UploadSection = ({ onDataParsed }) => {
           ref={fileInputRef} 
           type="file" 
           id="input-file-upload" 
-          multiple={false} 
+          multiple={true} 
           onChange={handleChange} 
           accept=".csv, .xlsx, .xls"
           style={{ display: 'none' }}
@@ -251,8 +309,8 @@ export const UploadSection = ({ onDataParsed }) => {
           style={{ padding: '4.5rem 2rem' }}
         >
           <Upload className="upload-icon" style={{ color: 'var(--primary)', width: '54px', height: '54px', marginBottom: '1.25rem' }} />
-          <h3 style={{ fontSize: '1.25rem', fontWeight: 700, marginBottom: '0.5rem' }}>Drag and drop file here</h3>
-          <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem', marginBottom: '1.75rem' }}>or click to browse local files</p>
+          <h3 style={{ fontSize: '1.25rem', fontWeight: 700, marginBottom: '0.5rem' }}>Drag and drop files here</h3>
+          <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem', marginBottom: '1.75rem' }}>or click to browse multiple local files</p>
           
           <button 
             type="button" 
