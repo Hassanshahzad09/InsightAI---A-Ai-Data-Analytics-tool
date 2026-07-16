@@ -165,6 +165,7 @@ export const DataPreview = ({ data, schema, fileName }) => {
             className="select-control"
             value={rowsPerPage}
             onChange={(e) => { setRowsPerPage(Number(e.target.value)); setCurrentPage(1); }}
+            style={{ width: '80px', height: '36px', padding: '0.35rem 0.5rem', paddingRight: '1.5rem', backgroundPosition: 'right 6px center' }}
           >
             <option value={10}>10</option>
             <option value={15}>15</option>

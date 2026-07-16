@@ -8,6 +8,8 @@ import { DataCleaner } from './components/DataCleaner';
 import { DataPreview } from './components/DataPreview';
 import { Dashboard } from './components/Dashboard';
 import { Insights } from './components/Insights';
+import { Reports } from './components/Reports';
+import { Settings } from './components/Settings';
 import { analyzeDataset } from './utils/dataProcessor';
 import { generateInsights } from './utils/insightGenerator';
 import { 
@@ -88,6 +90,38 @@ function App() {
   const handleResetDataWithConfirm = () => {
     if (window.confirm("Are you sure you want to unload the current dataset? All cleaned data and insights will be cleared.")) {
       handleResetData();
+    }
+  };
+
+  const handleProfileUpdate = (profileData) => {
+    if (demoUser) {
+      setDemoUser(prev => {
+        if (!prev) return null;
+        return {
+          ...prev,
+          user: {
+            ...prev.user,
+            user_metadata: {
+              ...prev.user.user_metadata,
+              full_name: profileData.fullName,
+              company_name: profileData.companyName,
+              job_role: profileData.jobRole
+            }
+          }
+        };
+      });
+    } else {
+      supabase.auth.getUser().then(({ data: { user } }) => {
+        if (user) {
+          setSession(prev => {
+            if (!prev) return null;
+            return {
+              ...prev,
+              user
+            };
+          });
+        }
+      });
     }
   };
 
@@ -298,6 +332,27 @@ function App() {
               stats={stats}
               data={cleanedData}
               generatedInsights={insights}
+            />
+          )}
+
+          {currentView === 'reports' && cleanedData && stats && (
+            <Reports 
+              data={cleanedData}
+              schema={schema}
+              stats={stats}
+              fileName={fileName}
+            />
+          )}
+
+          {currentView === 'settings' && (
+            <Settings 
+              userSession={{
+                email: userFullName,
+                companyName: activeUser?.user_metadata?.company_name || 'Enterprise Labs',
+                jobRole: activeUser?.user_metadata?.job_role || 'Data Analyst',
+                isDemo: !!demoUser
+              }}
+              onProfileUpdate={handleProfileUpdate}
             />
           )}
 

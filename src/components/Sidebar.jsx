@@ -29,8 +29,8 @@ export const Sidebar = ({
     { id: 'preview', label: 'Data Preview', icon: Table, requiresData: true },
     { id: 'dashboard', label: 'Analytics Dashboard', icon: BarChart3, requiresData: true },
     { id: 'insights', label: 'AI Insights', icon: Sparkles, requiresData: true },
-    { id: 'reports', label: 'Reports', icon: FileText, requiresData: true, isMock: true },
-    { id: 'settings', label: 'Settings', icon: Settings, requiresData: false, isMock: true },
+    { id: 'reports', label: 'Reports', icon: FileText, requiresData: true },
+    { id: 'settings', label: 'Settings', icon: Settings, requiresData: false },
   ];
 
   return (

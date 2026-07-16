@@ -19,8 +19,8 @@
   /* SaaS Hex Color Palette */
   --primary: #6366f1;       /* Indigo */
   --primary-glow: rgba(99, 102, 241, 0.15);
-  --secondary: #8b5cf6;     /* Purple */
-  --secondary-glow: rgba(139, 92, 246, 0.15);
+  --secondary: #84cc16;     /* Parrot Green */
+  --secondary-glow: rgba(132, 204, 22, 0.15);
   --accent: #06b6d4;        /* Cyan */
   
   /* Semantic Alerts */
@@ -60,8 +60,8 @@
   
   --primary: #818cf8;       /* Lighter Indigo for Dark Mode */
   --primary-glow: rgba(129, 140, 248, 0.22);
-  --secondary: #a78bfa;     /* Lighter Purple */
-  --secondary-glow: rgba(167, 139, 250, 0.22);
+  --secondary: #a3e635;     /* Lighter Parrot Green */
+  --secondary-glow: rgba(163, 230, 53, 0.22);
   
   --shadow-sm: 0 4px 15px rgba(0, 0, 0, 0.25);
   --shadow-md: 0 16px 40px rgba(0, 0, 0, 0.4);
@@ -379,7 +379,7 @@ h1, h2, h3, h4, h5, h6 {
 .glass-card.hoverable:hover {
   transform: translateY(-4px);
   box-shadow: var(--shadow-lg), 0 12px 25px -10px var(--primary-glow);
-  border-color: rgba(139, 92, 246, 0.25);
+  border-color: rgba(132, 204, 22, 0.25);
 }
 
 /* Welcome Hero Banner */
@@ -536,7 +536,7 @@ h1, h2, h3, h4, h5, h6 {
   flex-direction: column;
   gap: 1.5rem;
   border-left: 2px solid transparent;
-  background: linear-gradient(145deg, var(--panel-bg) 0%, rgba(139, 92, 246, 0.03) 100%);
+  background: linear-gradient(145deg, var(--panel-bg) 0%, rgba(132, 204, 22, 0.03) 100%);
   overflow: hidden;
 }
 
@@ -804,5 +804,52 @@ h1, h2, h3, h4, h5, h6 {
   }
   .kpi-grid {
     grid-template-columns: 1fr !important;
+  }
+}
+
+/* Search Input Glass Styling */
+.search-input {
+  background-color: var(--panel-bg-solid);
+  border: 1px solid var(--border-color);
+  color: var(--text-main);
+  border-radius: 8px;
+  padding: 0.55rem 1rem;
+  font-size: 0.88rem;
+  font-weight: 500;
+  outline: none;
+  transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
+  width: 100%;
+}
+.search-input:focus {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px var(--primary-glow);
+}
+
+/* Executive Grid System */
+.executive-dashboard-grid {
+  display: grid;
+  grid-template-columns: repeat(12, 1fr);
+  gap: 1.25rem;
+  width: 100%;
+}
+
+/* Print Media Overrides for Reports */
+@media print {
+  body {
+    background: white !important;
+    color: black !important;
+  }
+  .sidebar, .top-nav, .btn, .top-nav-actions, .sidebar-footer, .filter-bar, .page-controls {
+    display: none !important;
+  }
+  .main-content {
+    margin-left: 0 !important;
+    padding: 0 !important;
+  }
+  .glass-card {
+    border: none !important;
+    box-shadow: none !important;
+    background: transparent !important;
+    padding: 0 !important;
   }
 }
