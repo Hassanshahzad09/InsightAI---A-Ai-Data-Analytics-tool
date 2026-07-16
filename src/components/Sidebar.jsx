@@ -132,7 +132,7 @@ export const Sidebar = ({
               <>
                 <div className="sidebar-user-info" style={{ flex: 1 }}>
                   <span className="sidebar-user-email">{userSession.email}</span>
-                  <span className="sidebar-user-role">{userSession.isDemo ? 'Guest Account' : 'Enterprise User'}</span>
+                  <span className="sidebar-user-role">{userSession.jobRole}</span>
                 </div>
                 <button 
                   onClick={onLogout}

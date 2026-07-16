@@ -120,6 +120,7 @@ function App() {
   };
 
   const activeUser = session?.user || demoUser?.user || null;
+  const userFullName = activeUser?.user_metadata?.full_name || activeUser?.email?.split('@')[0] || 'User';
 
   // Render Auth screen if not logged in
   if (!activeUser) {
@@ -150,8 +151,9 @@ function App() {
         collapsed={sidebarCollapsed}
         setCollapsed={setSidebarCollapsed}
         userSession={{
-          email: activeUser.email,
-          isDemo: !!demoUser
+          email: userFullName,
+          isDemo: !!demoUser,
+          jobRole: activeUser?.user_metadata?.job_role || 'Enterprise User'
         }}
         onLogout={handleLogout}
       />
@@ -182,10 +184,10 @@ function App() {
             {/* Profile Avatar widget */}
             <div className="user-profile-widget">
               <div className="user-avatar">
-                {activeUser.email.charAt(0).toUpperCase()}
+                {userFullName.charAt(0).toUpperCase()}
               </div>
               <span style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-main)', display: 'block', maxWidth: '120px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                {activeUser.email.split('@')[0]}
+                {userFullName}
               </span>
             </div>
           </div>
@@ -198,7 +200,7 @@ function App() {
           {currentView === 'upload' && !rawData && (
             <div className="welcome-hero animate-scale-in">
               <div>
-                <h2>Welcome back, {activeUser.email.split('@')[0]}!</h2>
+                <h2>Welcome back, {userFullName}!</h2>
                 <p>
                   Start your analytical session. Upload a CSV or Excel spreadsheet below to run type inference, remove duplicate records, impute values, and trigger local business intelligence insights.
                 </p>
