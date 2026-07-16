@@ -70,8 +70,19 @@ class ErrorBoundary extends React.Component {
 }
 
 function App() {
-  // Authentication states
-  const [session, setSession] = useState(null);
+  // Static bypass session setup (bypasses login/Supabase auth completely)
+  const staticSession = {
+    user: { 
+      email: 'Hassan Shahzad khan', 
+      id: 'hassan-user-id',
+      user_metadata: {
+        full_name: 'Hassan Shahzad khan',
+        job_role: 'Data Analyst'
+      }
+    }
+  };
+
+  const [session, setSession] = useState(staticSession);
   const [demoUser, setDemoUser] = useState(null);
 
   // Data states
@@ -87,37 +98,9 @@ function App() {
   const [currentView, setCurrentView] = useState('upload');
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
 
-  // Supabase Auth State Change Listener
-  useEffect(() => {
-    if (isSupabaseConfigured) {
-      // Get initial session
-      supabase.auth.getSession().then(({ data: { session: initialSession } }) => {
-        setSession(initialSession);
-      });
-
-      // Listen for auth events
-      const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, newSession) => {
-        setSession(newSession);
-        if (!newSession) {
-          handleResetData();
-        }
-      });
-
-      return () => subscription.unsubscribe();
-    }
-  }, []);
-
-  const handleDemoBypass = (mockUser) => {
-    setDemoUser(mockUser);
-  };
-
-  const handleLogout = async () => {
-    if (demoUser) {
-      setDemoUser(null);
-      handleResetData();
-    } else if (isSupabaseConfigured) {
-      await supabase.auth.signOut();
-    }
+  const handleLogout = () => {
+    // Unloads active file session
+    handleResetData();
   };
 
   // Helper reset data on logout or file change
@@ -217,27 +200,8 @@ function App() {
     }
   };
 
-  const activeUser = session?.user || demoUser?.user || null;
-  const userFullName = activeUser?.user_metadata?.full_name || activeUser?.email?.split('@')[0] || 'User';
-
-  // Render Auth screen if not logged in
-  if (!activeUser) {
-    return (
-      <div style={{ background: 'var(--bg-gradient)', minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
-        <div style={{ padding: '1rem 2.25rem', borderBottom: '1px solid var(--panel-border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-            <div className="sidebar-logo">I</div>
-            <span className="sidebar-title">InsightAI</span>
-          </div>
-          <ThemeToggle />
-        </div>
-        <Auth onDemoBypass={handleDemoBypass} />
-        <footer style={{ marginTop: 'auto', textAlign: 'center', padding: '1.5rem', fontSize: '0.75rem', color: 'var(--text-muted)' }}>
-          InsightAI v1.2.0 © 2026. All rights reserved.
-        </footer>
-      </div>
-    );
-  }
+  const activeUser = session?.user || null;
+  const userFullName = activeUser?.user_metadata?.full_name || 'Hassan Shahzad khan';
 
   return (
     <div className="app-container">
