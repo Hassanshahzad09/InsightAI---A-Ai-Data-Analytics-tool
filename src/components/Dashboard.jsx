@@ -21,7 +21,7 @@ import {
   Grid
 } from 'lucide-react';
 
-const COLORS = ['#06b6d4', '#84cc16', '#6366f1', '#f59e0b', '#22c55e', '#ef4444'];
+const COLORS = ['#06b6d4', '#84cc16', '#10b981', '#f59e0b', '#22c55e', '#ef4444'];
 
 export const Dashboard = ({ data, schema, stats }) => {
   // Filter States
