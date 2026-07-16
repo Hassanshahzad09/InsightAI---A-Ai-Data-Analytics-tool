@@ -88,7 +88,7 @@ export const Dashboard = ({ data, schema, stats }) => {
 
   // Universal dynamic grouped aggregator
   const getGroupedChartData = (xAxisCol, groupCol, measureCol, operation = 'count') => {
-    if (!xAxisCol) return [];
+    if (!xAxisCol) return { keys: [], data: [] };
     const groups = {};
     const uniqueGroupVals = new Set();
 
@@ -202,7 +202,7 @@ export const Dashboard = ({ data, schema, stats }) => {
           </div>
 
           {stats.categoricalColumns.slice(0, 2).map(col => {
-            const uniqueVals = stats.categoricalStats[col]?.topValues.map(v => v.value) || [];
+            const uniqueVals = stats.categoricalStats[col]?.topValues?.map(v => v.value) || [];
             return (
               <div key={col}>
                 <select 
