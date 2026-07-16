@@ -76,9 +76,9 @@ export const Dashboard = ({ data, schema, stats }) => {
     });
   }, [data, globalSearch, selectedFilters, startDate, endDate, stats]);
 
-  // Determine dynamic columns to map to reference layout
   const primaryNum = stats.numericColumns[0] || '';
   const secondaryNum = stats.numericColumns[1] || primaryNum || '';
+  const numName = primaryNum || 'Value';
 
   const catStage = stats.categoricalColumns[0] || 'Stage';
   const catPartner = stats.categoricalColumns[1] || stats.categoricalColumns[0] || 'Partner';
