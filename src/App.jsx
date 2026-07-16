@@ -163,14 +163,39 @@ function App() {
         
         {/* Sticky Top Navigation */}
         <div className="top-nav">
-          <div className="top-nav-search">
-            <Search size={16} style={{ position: 'absolute', left: '12px', color: 'var(--text-muted)' }} />
-            <input 
-              type="text" 
-              placeholder="Search assets, databases, or help..." 
-              className="search-input" 
-              style={{ paddingLeft: '2.5rem', width: '100%', minWidth: 'unset', height: '36px', borderRadius: '8px' }}
-            />
+          <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+            {currentView !== 'upload' && (
+              <button 
+                onClick={() => setCurrentView('upload')}
+                className="btn btn-secondary animate-scale-in"
+                style={{ 
+                  height: '36px', 
+                  padding: '0 0.85rem', 
+                  fontSize: '0.82rem', 
+                  display: 'inline-flex', 
+                  alignItems: 'center', 
+                  gap: '0.35rem', 
+                  borderRadius: '8px', 
+                  border: '1px solid var(--border-color)',
+                  background: 'var(--panel-bg-solid)',
+                  color: 'var(--text-main)',
+                  cursor: 'pointer',
+                  fontWeight: 600
+                }}
+              >
+                ← Back to Prep
+              </button>
+            )}
+            
+            <div className="top-nav-search">
+              <Search size={16} style={{ position: 'absolute', left: '12px', color: 'var(--text-muted)' }} />
+              <input 
+                type="text" 
+                placeholder="Search assets, databases, or help..." 
+                className="search-input" 
+                style={{ paddingLeft: '2.5rem', width: '100%', minWidth: 'unset', height: '36px', borderRadius: '8px' }}
+              />
+            </div>
           </div>
 
           <div className="top-nav-actions">
