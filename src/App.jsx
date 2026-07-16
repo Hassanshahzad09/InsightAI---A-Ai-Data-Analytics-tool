@@ -139,18 +139,30 @@ function App() {
 
   // Imputations complete
   const handleCleaningComplete = (cleaned, inferredSchema, report) => {
-    setCleanedData(cleaned);
-    setSchema(inferredSchema);
-    setCleaningReport(report);
+    try {
+      setCleanedData(cleaned);
+      setSchema(inferredSchema);
+      setCleaningReport(report);
 
-    const computedStats = analyzeDataset(cleaned, inferredSchema);
-    setStats(computedStats);
+      const computedStats = analyzeDataset(cleaned, inferredSchema);
+      setStats(computedStats);
 
-    const generated = generateInsights(computedStats, cleaned);
-    setInsights(generated);
+      const generated = generateInsights(computedStats, cleaned);
+      setInsights(generated);
 
-    // Auto route to dashboard
-    setCurrentView('dashboard');
+      // Auto route to dashboard
+      setCurrentView('dashboard');
+    } catch (err) {
+      console.error("Dataset Analysis Failed:", err);
+      alert(`Failed to analyze dataset details:\n${err.message}\n\nPlease try again with another file, or verify the contents are standard tabular records.`);
+      // Reset variables to keep UI clean and stable
+      setCleanedData(null);
+      setSchema(null);
+      setStats(null);
+      setInsights(null);
+      setCleaningReport(null);
+      setCurrentView('upload');
+    }
   };
 
   const activeUser = session?.user || demoUser?.user || null;

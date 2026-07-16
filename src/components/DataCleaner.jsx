@@ -84,100 +84,112 @@ export const DataCleaner = ({ rawData, fileName, onCleaningComplete }) => {
     };
 
     const processFinalData = async () => {
-      await runStep(2);
-      await runStep(3);
-      await runStep(4);
-      await runStep(5);
-      await runStep(6);
-      await runStep(7);
+      try {
+        await runStep(2);
+        await runStep(3);
+        await runStep(4);
+        await runStep(5);
+        await runStep(6);
+        await runStep(7);
 
-      setTimeout(() => {
-        let data = [...rawData];
-        let schema = { ...inferredSchema };
-        const rawRowsCount = rawData.length;
-        let duplicatesRemovedCount = 0;
-        let missingFieldsFilled = 0;
+        setTimeout(() => {
+          try {
+            let data = [...rawData];
+            let schema = { ...inferredSchema };
+            const rawRowsCount = rawData.length;
+            let duplicatesRemovedCount = 0;
+            let missingFieldsFilled = 0;
 
-        // 1. Standardize column names
-        if (shouldStandardizeNames) {
-          data = standardizeColumnNames(data);
-          const tempSchema = {};
-          const oldKeys = Object.keys(inferredSchema);
-          
-          oldKeys.forEach(col => {
-            let clean = col.trim()
-              .replace(/[^\w\s-]/gi, '')
-              .replace(/\s+/g, ' ');
-            clean = clean.split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
-            if (!clean) clean = `Column_${Math.random().toString(36).substr(2, 4)}`;
-            
-            let finalName = clean;
-            let counter = 1;
-            while (Object.keys(tempSchema).includes(finalName)) {
-              finalName = `${clean}_${counter}`;
-              counter++;
+            // 1. Standardize column names
+            if (shouldStandardizeNames) {
+              data = standardizeColumnNames(data);
+              const tempSchema = {};
+              const oldKeys = Object.keys(inferredSchema);
+              
+              oldKeys.forEach(col => {
+                let clean = col.trim()
+                  .replace(/[^\w\s-]/gi, '')
+                  .replace(/\s+/g, ' ');
+                clean = clean.split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
+                if (!clean) clean = `Column_${oldKeys.indexOf(col) + 1}`;
+                
+                let finalName = clean;
+                let counter = 1;
+                while (Object.keys(tempSchema).includes(finalName)) {
+                  finalName = `${clean}_${counter}`;
+                  counter++;
+                }
+                tempSchema[finalName] = inferredSchema[col];
+              });
+              schema = tempSchema;
             }
-            tempSchema[finalName] = inferredSchema[col];
-          });
-          schema = tempSchema;
-        }
 
-        // Count missing
-        const columns = Object.keys(schema);
-        columns.forEach(col => {
-          data.forEach(row => {
-            const val = row[col];
-            if (val === null || val === undefined || String(val).trim() === '') {
-              missingFieldsFilled++;
+            // Count missing
+            const columns = Object.keys(schema);
+            columns.forEach(col => {
+              data.forEach(row => {
+                const val = row[col];
+                if (val === null || val === undefined || String(val).trim() === '') {
+                  missingFieldsFilled++;
+                }
+              });
+            });
+
+            // 2. Remove Duplicates
+            if (shouldRemoveDuplicates) {
+              const uniqueData = removeDuplicates(data);
+              duplicatesRemovedCount = data.length - uniqueData.length;
+              data = uniqueData;
             }
-          });
-        });
 
-        // 2. Remove Duplicates
-        if (shouldRemoveDuplicates) {
-          const uniqueData = removeDuplicates(data);
-          duplicatesRemovedCount = data.length - uniqueData.length;
-          data = uniqueData;
-        }
+            // 3. Impute Missing Values
+            data = cleanMissingValues(data, schema, {
+              numeric: numericMethod,
+              categorical: categoricalMethod,
+              date: dateMethod
+            });
 
-        // 3. Impute Missing Values
-        data = cleanMissingValues(data, schema, {
-          numeric: numericMethod,
-          categorical: categoricalMethod,
-          date: dateMethod
-        });
-
-        // 4. Standardize Dates
-        if (shouldStandardizeDates) {
-          data = standardizeDates(data, schema);
-        }
-
-        // Count outliers
-        const outliers = detectOutlierRanges(data, schema);
-        let outlierTotalCount = 0;
-        Object.keys(outliers).forEach(col => {
-          const range = outliers[col];
-          data.forEach(row => {
-            const val = Number(row[col]);
-            if (!isNaN(val) && (val < range.lower || val > range.upper)) {
-              outlierTotalCount++;
+            // 4. Standardize Dates
+            if (shouldStandardizeDates) {
+              data = standardizeDates(data, schema);
             }
-          });
-        });
 
-        const report = {
-          originalRows: rawRowsCount,
-          cleanedRows: data.length,
-          duplicatesRemoved: duplicatesRemovedCount,
-          missingFieldsFilled,
-          outliersDetected: outlierTotalCount,
-          colsCount: columns.length
-        };
+            // Count outliers
+            const outliers = detectOutlierRanges(data, schema);
+            let outlierTotalCount = 0;
+            Object.keys(outliers).forEach(col => {
+              const range = outliers[col];
+              data.forEach(row => {
+                const val = Number(row[col]);
+                if (!isNaN(val) && (val < range.lower || val > range.upper)) {
+                  outlierTotalCount++;
+                }
+              });
+            });
 
-        setCleaningReport(report);
+            const report = {
+              originalRows: rawRowsCount,
+              cleanedRows: data.length,
+              duplicatesRemoved: duplicatesRemovedCount,
+              missingFieldsFilled,
+              outliersDetected: outlierTotalCount,
+              colsCount: columns.length
+            };
+
+            setCleaningReport(report);
+            setCleaning(false);
+            onCleaningComplete(data, schema, report);
+          } catch (innerErr) {
+            console.error("Data pipeline processing failed:", innerErr);
+            alert(`Cleaning pipeline failed during execution:\n${innerErr.message}`);
+            setCleaning(false);
+          }
+        }, 300);
+      } catch (err) {
+        console.error("Data pipeline animation failed:", err);
+        alert(`Cleaning animation failed:\n${err.message}`);
         setCleaning(false);
-        onCleaningComplete(data, schema, report);
-      }, 300);
+      }
     };
 
     processFinalData();

@@ -107,7 +107,7 @@ export const generateInsights = (stats, data) => {
           column: col,
           count: numInfo.outliersCount,
           percentage: outlierPct.toFixed(1),
-          description: `**${numInfo.outliersCount} record(s)** (${outlierPct.toFixed(1)}% of rows) in **${col}** were identified as statistical outliers. Standard range lies between **${numInfo.outlierLower.toLocaleString(undefined, {maximumFractionDigits:2})}** and **${numInfo.outlierUpper.toLocaleString(undefined, {maximumFractionDigits:2})}**.`
+          description: `**${numInfo.outliersCount} record(s)** (${outlierPct.toFixed(1)}% of rows) in **${col}** were identified as statistical outliers. Standard range lies between **${numInfo.outlierLower !== null && numInfo.outlierLower !== undefined ? numInfo.outlierLower.toLocaleString(undefined, {maximumFractionDigits:2}) : 'N/A'}** and **${numInfo.outlierUpper !== null && numInfo.outlierUpper !== undefined ? numInfo.outlierUpper.toLocaleString(undefined, {maximumFractionDigits:2}) : 'N/A'}**.`
         });
         
         if (outlierPct > 5) {

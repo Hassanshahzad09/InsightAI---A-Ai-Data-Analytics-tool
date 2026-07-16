@@ -105,7 +105,7 @@ export const standardizeColumnNames = (data) => {
       .map(word => word.charAt(0).toUpperCase() + word.slice(1))
       .join(' ');
       
-    if (!clean) clean = `Column_${Math.random().toString(36).substr(2, 4)}`;
+    if (!clean) clean = `Column_${oldColumns.indexOf(col) + 1}`;
     
     // Resolve duplicates in standardized names
     let finalName = clean;
