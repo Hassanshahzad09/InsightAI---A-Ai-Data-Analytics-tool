@@ -122,40 +122,7 @@ export const Sidebar = ({
           <span className="sidebar-item-text">Collapse Menu</span>
         </button>
 
-        {/* User profile & Logout */}
-        {userSession && (
-          <div className="sidebar-user-section animate-scale-in">
-            <div className="user-avatar" style={{ width: '30px', height: '30px', fontSize: '0.75rem' }}>
-              {userSession.email.charAt(0).toUpperCase()}
-            </div>
-            {!collapsed && (
-              <>
-                <div className="sidebar-user-info" style={{ flex: 1 }}>
-                  <span className="sidebar-user-email">{userSession.email}</span>
-                  <span className="sidebar-user-role">{userSession.jobRole}</span>
-                </div>
-                <button 
-                  onClick={onLogout}
-                  title="Sign Out"
-                  style={{
-                    background: 'transparent',
-                    border: 'none',
-                    color: 'var(--text-muted)',
-                    cursor: 'pointer',
-                    display: 'flex',
-                    alignItems: 'center',
-                    padding: '0.2rem',
-                    borderRadius: '4px'
-                  }}
-                  onMouseOver={(e) => e.currentTarget.style.color = 'var(--danger)'}
-                  onMouseOut={(e) => e.currentTarget.style.color = 'var(--text-muted)'}
-                >
-                  <LogOut size={16} />
-                </button>
-              </>
-            )}
-          </div>
-        )}
+
 
       </div>
     </div>
